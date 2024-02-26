@@ -1,0 +1,5 @@
+{
+    "user1": ["AAPL", "IBM", "MSFT", "GOOGL", "AMZN"],
+    "user2": ["AAPL", "TSLA", "META", "NFLX", "NVDA"],
+    "user3": ["BRK/A", "TSM", "ORCL", "CSCO"]
+}
