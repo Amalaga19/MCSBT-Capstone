@@ -10,7 +10,7 @@ function App() {
   const [timeframe, setTimeframe] = useState(null); //The timeframe for which to view the price history of the selected ticker.
 
   const user = "user1"; //currently hardcoded, but will be dynamic in the future, as a sign-in page will be added.
-  const backendUrl = " https://mcsbt-integration-ams.ew.r.appspot.com/api"; //The URL of the backend API. Once deployed, this will be the URL of the deployed backend.
+  const backendUrl = "https://mcsbt-integration-ams.ew.r.appspot.com/api"; //The URL of the backend API. Once deployed, this will be the URL of the deployed backend.
 
 const clickTicker = async (ticker) =>{ //selects a ticker to view its price history.
   if(ticker !== selectedTicker){
