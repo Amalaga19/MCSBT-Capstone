@@ -90,7 +90,7 @@ def get_latest_closing_price(price_history):
         print(f"Error fetching the latest closing price: {e}")
         return float("NaN")
 
-def total_portfolio_calc(stocks):
+def total_portfolio_calc(stocks): #This function calculates the total value of the portfolio
     total = 0
     for ticker, amount in stocks.items():
         data = call_api_daily(ticker)
@@ -101,19 +101,7 @@ def total_portfolio_calc(stocks):
             print(f"Could not fetch data for {ticker}.")
     return round(total, 2)
 
-def build_user_stocks_and_prices(user):
-    stocks_list = get_user_stocks_list(user)
-    tickers_and_prices = {}
-    for ticker in stocks_list:
-        try:
-            closing_price = get_latest_closing_price(call_api_daily(ticker))
-        except Exception as e:
-            print("Error:", e)
-            closing_price = float("NaN")
-        tickers_and_prices[ticker] = closing_price
-    return tickers_and_prices
-
-def make_portfolio(user): #setting this up for later
+def make_portfolio(user): #This function builds the portfolio of a user
     portfolio = {}
     portfolio["username"] = user
     stocks_list = get_user_stocks_list(user)
@@ -133,30 +121,25 @@ def make_portfolio(user): #setting this up for later
     portfolio["total_value"] = total_portfolio_calc(get_user_stocks_list(user))
     return portfolio
 
-
-
-@app.route("/api/<user>/portfolio")
+@app.route("/api/<user>/portfolio") #This route returns the complete portfolio of the user
 def get_portfolio(user):
     portfolio = make_portfolio(user)
-    user_tickers_and_prices = build_user_stocks_and_prices(user)
     return jsonify(portfolio)
 
-@app.route("/api/<user>/portfolio/total")
+@app.route("/api/<user>/portfolio/total") #This route returns the total value of the portfolio of the user
 def get_total_portfolio(user):
     portfolio = make_portfolio(user)
     return jsonify({"Total Value of Portfolio: ": portfolio["total_value"],})
 
-
-
-@app.route("/api/<user>/portfolio/<stock>/<timeframe>")
-def get_past_prices(user, stock, timeframe):
+@app.route("/api/<user>/portfolio/<stock>/<timeframe>") #This route returns the past prices of a stock in the user's portfolio for a given timeframe
+def get_past_prices(user, stock, timeframe): #user is not used here, but it helps to keep the structure of the routes consistent
     data = call_api_daily(stock)
     timeframe = int(timeframe)
     if "Time Series (Daily)" in data:
         past_prices_data = custom_timeframe(data["Time Series (Daily)"], timeframe)
         past_prices = {}
         for date in past_prices_data:
-            past_prices[date] = past_prices_data[date]["4. close"]
+            past_prices[date] = "{:.2f}".format(float(past_prices_data[date]["4. close"]))
         return jsonify(past_prices)
     else:
         return jsonify({"error": "Data not found for the given stock"}), 404

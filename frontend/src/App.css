@@ -36,18 +36,32 @@
     transform: rotate(360deg);
   }
 }
-p{
+p {
   color: blue;
   font-family: "Lucida Console", "Courier New", monospace;
-
 }
-h1{
-  color:teal;
+
+h1 {
+  color: teal;
   font-family: "Lucida Console", "Courier New", monospace;
-
 }
-body{
+
+h2, h3 {
+  color: darkslategray;
+}
+
+body {
   background-color: honeydew;
   font-family: "Lucida Console", "Courier New", monospace;
+}
 
+button {
+  background-color: honeydew;
+  color: teal;
+  padding: 10px 20px;
+  border-radius: 5px;
+  border: 2px solid teal; /* Ensure border is visible */
+  margin: 25px;
+  cursor: pointer;
+  font-family: "Lucida Console", "Courier New", monospace;
 }
