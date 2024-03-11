@@ -1,4 +1,4 @@
 runtime: python39
 
 env_variables:
-  ALPHA_VANTAGE_KEY = "YX2FGEIVWJY89MVU"
+  ALPHA_VANTAGE_KEY: "YX2FGEIVWJY89MVU"
