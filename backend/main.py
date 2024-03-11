@@ -13,7 +13,6 @@ CORS(app)
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
 
-
 #Here we store the user database in a dictionary (currently all users are hardcoded into the db)
 with open("user_database.json", 'r') as users:
     users_dict = json.load(users)
