@@ -4,13 +4,12 @@ import './App.css';
 function App() {
   const [portfolio, setPortfolio] = useState(null); //The user's portfolio.
   const [error, setError] = useState(""); //Error message to display if fetching data fails.
-  const [total, setTotal] = useState(null); //Total value of the user's portfolio.
   const [selectedTicker, setTicker] = useState(null); //The ticker whose price history is currently being viewed.
   const [priceHistory, setPriceHistory] = useState(null); //Price history of the selected ticker.
   const [timeframe, setTimeframe] = useState(null); //The timeframe for which to view the price history of the selected ticker.
 
   const user = "user1"; //currently hardcoded, but will be dynamic in the future, as a sign-in page will be added.
-  const backendUrl = "https://mcsbt-integration-ams.ew.r.appspot.com/api"; //The URL of the backend API. Once deployed, this will be the URL of the deployed backend.
+  const backendUrl = "http://localhost:5000/api"; //The URL of the backend API. Once deployed, this will be the URL of the deployed backend.
 
 const clickTicker = async (ticker) =>{ //selects a ticker to view its price history.
   if(ticker !== selectedTicker){
@@ -42,20 +41,6 @@ const clickTicker = async (ticker) =>{ //selects a ticker to view its price hist
     }
   };
 
-  const fetchPortfolioTotal = async () => { //fetches the total value of the user's portfolio.
-    try {
-      const response = await fetch(`${backendUrl}/${user}/portfolio/total`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const total = await response.json();
-      setTotal(total);
-    } catch (error) {
-      console.error("Error fetching data: ", error);
-      setError("Failed to load data.");
-    }
-  };
-
   const fetchTickerPriceHistory = async (ticker, time) => { //fetches the price history of the selected ticker for the specified timeframe.
     try {
       const response = await fetch(`${backendUrl}/${user}/portfolio/${ticker}/${time}`);
@@ -72,7 +57,6 @@ const clickTicker = async (ticker) =>{ //selects a ticker to view its price hist
 
   useEffect(() => { //As soon as the app loads the user's portfolio and its total value are fetched.
     fetchPortfolio();
-    fetchPortfolioTotal();
   }, []);
 
   return (
@@ -91,7 +75,7 @@ const clickTicker = async (ticker) =>{ //selects a ticker to view its price hist
           ))}
         </div>
       )}
-      {total && <h2>Total Portfolio Value: ${total['Total Value of Portfolio: '] }</h2> /*shows the total value of the user's portfolio.*/} 
+      {portfolio && <h2>Total Portfolio Value: ${portfolio['total_value'] }</h2> /*shows the total value of the user's portfolio.*/} 
       {!selectedTicker && <h2>Click on a ticker to view its price history.</h2>}
       {selectedTicker && ( //If a ticker is selected, display buttons to select or change the timeframe for which to view its price history.
         <>

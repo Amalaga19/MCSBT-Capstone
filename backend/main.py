@@ -6,16 +6,34 @@ import json
 import os
 import requests
 from flask_cors import CORS
-
+import models
+from models import db, Users, Stocks  # Import db, Users, Stocks directly from models
+from sqlalchemy.pool import NullPool
+import oracledb
 
 app = Flask(__name__)
 CORS(app)
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
 
-#Here we store the user database in a dictionary (currently all users are hardcoded into the db)
-with open("user_database.json", 'r') as users:
-    users_dict = json.load(users)
+un = "ADMIN"
+pw = "Capstone.1234" 
+dsn = "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-madrid-1.oraclecloud.com))(connect_data=(service_name=g665fdafabbd3ee_capstonedb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))"
+
+pool = oracledb.create_pool(user=un, password=pw,dsn=dsn)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'oracle+oracledb://'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'creator': pool.acquire,
+    'poolclass': NullPool
+}
+app.config['SQLALCHEMY_ECHO'] = True
+db.init_app(app)
+
+with app.app_context():
+    db.create_all()
+
 
 def call_api_daily(ticker): #This function calls the Alpha Vantage API to get the daily values of a stock
     url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={ticker}&apikey={API_KEY}"
@@ -62,10 +80,14 @@ def custom_timeframe(price_history, time):
         print("Error:", e)
         return {}
 
-#Here we return the list of stocks a specific user has. If the user is not in the database the function will return "User not found."
-def get_user_stocks_list(id): 
+#Here we return the list of stocks owned by the user in the format {stock: quantity} (it's really a dictionary)
+def get_user_stocks_list(username): 
     try:
-        return users_dict[id]
+        user = Users.query.filter_by(USERNAME = username).first()
+        if user is None:
+            return None
+        else:
+            return {stock.SYMBOL: stock.QUANTITY for stock in user.stocks}
     except KeyError:
         flask.abort(404)
 
@@ -100,35 +122,25 @@ def total_portfolio_calc(stocks): #This function calculates the total value of t
             print(f"Could not fetch data for {ticker}.")
     return round(total, 2)
 
-def make_portfolio(user): #This function builds the portfolio of a user
-    portfolio = {}
-    portfolio["username"] = user
-    stocks_list = get_user_stocks_list(user)
-    if stocks_list is None:
-        print(f"User {user} not found.")
-        return jsonify({"error": "User not found."})
-    portfolio["stocks_owned"] = {}
-    for ticker, amount in stocks_list.items():
-        portfolio["stocks_owned"][ticker] = {"amount_owned": amount}
-        try:
-            data = call_api_daily(ticker)
-            closing_price = get_latest_closing_price(data)
-            portfolio["stocks_owned"][ticker]["latest_closing_price"] = closing_price
-        except Exception as e:
-            print(f"Error fetching or processing data for {ticker}: {e}")
-            portfolio["stocks_owned"][ticker]["latest_closing_price"] = float("NaN")
-    portfolio["total_value"] = total_portfolio_calc(get_user_stocks_list(user))
-    return portfolio
+def make_portfolio(username): #This function builds the portfolio of a user
+    try:
+        user = Users.query.filter_by(USERNAME = username).first()
+        if user is None:
+            print(f"User {user} not found.")
+            return jsonify({"error": "User not found."}), 404
+        portfolio = { "username": username, "stocks_owned": {}, "total_value": 0 }
+        stocks_list = get_user_stocks_list(username)
+        portfolio["total_value"] = total_portfolio_calc(stocks_list)
+        return portfolio
+    except Exception as e:
+        print(f"Error building portfolio for {username}: {e}")
+        return jsonify({"error": "An error occured."}), 500
+
 
 @app.route("/api/<user>/portfolio") #This route returns the complete portfolio of the user
 def get_portfolio(user):
     portfolio = make_portfolio(user)
     return jsonify(portfolio)
-
-@app.route("/api/<user>/portfolio/total") #This route returns the total value of the portfolio of the user
-def get_total_portfolio(user):
-    portfolio = make_portfolio(user)
-    return jsonify({"Total Value of Portfolio: ": portfolio["total_value"],})
 
 @app.route("/api/<user>/portfolio/<stock>/<timeframe>") #This route returns the past prices of a stock in the user's portfolio for a given timeframe
 def get_past_prices(user, stock, timeframe): #user is not used here, but it helps to keep the structure of the routes consistent
