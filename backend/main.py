@@ -20,12 +20,12 @@ from functools import wraps
 
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True, origins='http://localhost:3000')
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
-UN = os.getenv("ORACLE_UN")
-PW = os.getenv("ORACLE_PW")
-DSN = os.getenv("ORACLE_DSN")
+UN = "ADMIN"
+PW = "Capstone.1234"
+DSN = "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-madrid-1.oraclecloud.com))(connect_data=(service_name=g665fdafabbd3ee_capstonedb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))"
 
 pool = oracledb.create_pool(user=UN, password=PW,dsn=DSN)
 
@@ -202,19 +202,19 @@ def total_portfolio_calc(stocks): #This function calculates the total value of t
     return round(total, 2)
 
 
-def token_required(f): #This function is a decorator that checks if the user is logged in. Diego showed me how to do it.
+def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get("authorization")
+        token = request.headers.get('Authorization')
         if not token:
-            return jsonify({"message": "Token is missing."}), 403
-        if token.startswith("Bearer "):
-            token = token.split(" ")[1]
+            return jsonify({"message": "Token is missing!"}), 403
         try:
-            data = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            if token.startswith("Bearer "):
+                token = token.split(" ")[1]
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             user = Users.query.filter_by(USERNAME = data["username"]).first()
-        except Exception as e:
-            return jsonify({"message": "Token is invalid.", "error": str(e)}), 401
+        except:
+            return jsonify({'message': 'Token is invalid!'}), 401
         return f(user, *args, **kwargs)
     return decorated
 
@@ -309,17 +309,18 @@ def update_user():
         print(f"Error updating user: {e}")
         return jsonify({"message": "Error updating user."}), 400
 
-@app.route('/login', methods = ['GET'])
+@app.route('/login', methods = ['POST'])
 def login(): #This route is used to check the user's credentials and return a token if they are correct
     data = request.json
     username = Users.query.filter_by(USERNAME = data["username"]).first()
     password = data["password"]
     if username is not None:
         if check_password(username, password):
-            token = jwt.encode({"username": username, "iat": datetime.now(),"exp": datetime.now() + datetime.timedelta(minutes=120)}, app.config["SECRET_KEY"], algorithm="HS256")
-            return jsonify({"success": "true","message": "Login successful.", "token": token}), 200
-        else:
-            return jsonify({"success": "false","message": "User not found or incorrect password."}), 401
+            # Use username.USERNAME (or the correct attribute name) to get the actual username string
+            token = jwt.encode(
+                {"username": username.USERNAME, "iat": datetime.now(), "exp": datetime.now() + timedelta(minutes=120)},
+                app.config["SECRET_KEY"], algorithm="HS256")
+            return jsonify({"success": "true", "message": "Login successful.", "token": token}), 200
     else:
         return jsonify({"success": "false","message": "User not found or incorrect password."}), 404
 
