@@ -7,8 +7,8 @@ class Users(db.Model):
     __tablename__ = 'USERS'
     USER_ID = db.Column(db.Integer, Identity(start = 1, cycle = False), primary_key=True)
     USERNAME = db.Column(db.String(100), unique = True, nullable=False)
-    PASSWORD = db.Column(db.String(100), nullable=False)
-    stocks = db.relationship("STOCKS", back_populates="user")
+    PASSWORD = db.Column(db.String(1000), nullable=False) #1000 characters because the password will be hashed
+    stocks = db.relationship("Stocks", back_populates="user")
     
     def user_dict(self):
         return {"id": self.USER_ID, "username": self.USERNAME, "stocks": [stock.stock_dict() for stock in self.stocks]}

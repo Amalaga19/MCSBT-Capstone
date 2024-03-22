@@ -2,3 +2,7 @@ runtime: python39
 
 env_variables:
   ALPHA_VANTAGE_KEY: "YX2FGEIVWJY89MVU"
+  SECRET_KEY: "VES9TXH4QJICORT81LX3SBOCJQLLYF3F"
+  ORACLE_UN: "ADMIN"
+  ORACLE_PW: "Capstone.1234" 
+  ORACLE_DSN: "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-madrid-1.oraclecloud.com))(connect_data=(service_name=g665fdafabbd3ee_capstonedb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))"
