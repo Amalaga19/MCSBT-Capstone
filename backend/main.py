@@ -13,6 +13,12 @@ import argon2
 import jwt
 from functools import wraps
 
+#User = User1
+#Password = Password123
+
+#Create User function will be brought back if time permits
+
+
 app = Flask(__name__)
 CORS(app)
 load_dotenv()
@@ -91,23 +97,6 @@ def get_user_stocks_list(username):
             return {stock.SYMBOL: stock.QUANTITY for stock in user.stocks}
     except KeyError:
         flask.abort(404)
-
-
-def create_user(username, password): #This function creates a new user in the database
-    try:
-        check = Users.query.filter_by(USERNAME = username).first() #We check if the user already exists
-        if not check: #If the user does not exist, we create it
-            password_hash = argon2.argon2_hash(password)
-            user = Users(USERNAME = username, PASSWORD = password_hash)
-            db.session.add(user)
-            db.session.commit()
-            return jsonify({"message": "User created successfully."})
-        else:
-            return jsonify({"error": "User already exists."}), 409
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error creating user {username}: {e}")
-        return jsonify({"error": "An error occured."}), 500
 
 def check_password(username, password): #This function checks if the password is correct for the given user
     try:
@@ -228,7 +217,6 @@ def token_required(f): #This function is a decorator that checks if the user is 
             return jsonify({"message": "Token is invalid.", "error": str(e)}), 401
         return f(user, *args, **kwargs)
     return decorated
-
 
 @app.route("/api/portfolio", methods = ["GET"]) #This route returns the complete portfolio of the user
 @token_required
