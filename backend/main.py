@@ -23,19 +23,20 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*" : {"origins" : "*"}})
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
-UN = os.getenv("ORACLE_UN")
-PW = os.getenv("ORACLE_PW")
-DSN = os.getenv("ORACLE_DSN")
+UN = os.getenv("ORACLE_UN") #This gets the Oracle username from the .env file
+PW = os.getenv("ORACLE_PW") #This gets the Oracle password from the .env file
+DSN = os.getenv("ORACLE_DSN") #This gets the Oracle DSN from the .env file
 
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
-app.config['SESSION_COOKIE_SAMESITE'] = "None"
-app.config['SESSION_COOKIE_SECURE'] = True
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") #This gets the secret key from the .env file
+app.config['SESSION_COOKIE_SAMESITE'] = "None" #This is needed for the session to work with CORS
+app.config['SESSION_COOKIE_SECURE'] = True #This too
 
 
-ph = PasswordHasher()
+ph = PasswordHasher() #This is the password hasher object using the argon2 algorithm
 
-pool = oracledb.create_pool(user=UN, password=PW,dsn=DSN)
+pool = oracledb.create_pool(user=UN, password=PW,dsn=DSN) #This creates the connection pool to the Oracle database
 
+#This is the configuration for the database connection
 app.config['SQLALCHEMY_DATABASE_URI'] = 'oracle+oracledb://'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -49,6 +50,7 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+#This is a decorator function that adds the CORS headers to the response so the frontend can access the API
 def add_cors_headers(response):
     origin = request.headers.get('Origin')
     if origin:
@@ -125,7 +127,7 @@ def check_if_stock_exists(stock): #This function checks if a stock exists in the
         print(f"Error checking if {stock} exists: {e}")
         return False
 
-def check_password(username, password):
+def check_password(username, password): #This function checks if the password is correct for the user by hashing it and comparing it to the stored hash
     try:
         user = Users.query.filter_by(USERNAME=username).first()
         if user is None:
@@ -207,7 +209,7 @@ def check_for_stock(username, stock): #This function checks if a stock is in the
         print(f"Error checking for stock in {username}'s portfolio: {e}")
         return jsonify({"error": "An error occured."}), 500
 
-def get_latest_closing_price(stock):
+def get_latest_closing_price(stock): #This function gets the latest closing price of a stock
     try:
         data = call_api_daily(stock)
         latest_date = max(data["Time Series (Daily)"].keys())
@@ -252,7 +254,7 @@ def get_portfolio():
     return jsonify(portfolio)
 
 @app.route("/api/portfolio/<stock_symbol>", methods = ["GET"])
-def prices_history(stock_symbol):
+def prices_history(stock_symbol): #This route returns the historical prices of a stock
     historical_data = {}
     start_date_str = request.args.get("start_date")
     end_date_str = request.args.get("end_date")
@@ -342,7 +344,7 @@ def update_user():
         return jsonify({"message": "Error updating user."}), 400
 
 @app.route('/login', methods=['POST'])
-def login():
+def login(): #This route is used to log in the user
     data = request.json
     user = data.get("username")
     username = Users.query.filter_by(USERNAME=user).first()
@@ -354,7 +356,8 @@ def login():
         return jsonify({"username": session['username'], "message": "Logged in successfully."}), 200
     else:
         return jsonify({"success": "false", "message": "User not found or incorrect password."}), 404
-@app.route('/logout', methods=['GET'])
+
+@app.route('/logout', methods=['GET']) #This route is used to log out the user
 def logout():
     session.clear()
     return jsonify({"message": "Logged out."}), 200
