@@ -20,7 +20,7 @@ from functools import wraps
 
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/*" : {"origins" : "*"}})
+CORS(app, supports_credentials= True, resources={r"/api/*": {"origins": "https://mcsbt-integration-ams-frontend.storage.googleapis.com"}})
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
 UN = os.getenv("ORACLE_UN") #This gets the Oracle username from the .env file
@@ -343,8 +343,11 @@ def update_user():
         print(f"Error updating user: {e}")
         return jsonify({"message": "Error updating user."}), 400
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['POST', 'OPTIONS'])
 def login(): #This route is used to log in the user
+    if request.method == 'OPTIONS':
+        response = flask.make_response()
+        return add_cors_headers(response)
     data = request.json
     user = data.get("username")
     username = Users.query.filter_by(USERNAME=user).first()
