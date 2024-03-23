@@ -23,9 +23,9 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*" : {"origins" : "*"}})
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
-UN = "ADMIN"
-PW = "Capstone.1234"
-DSN = "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-madrid-1.oraclecloud.com))(connect_data=(service_name=g665fdafabbd3ee_capstonedb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))"
+UN = os.getenv("ORACLE_UN")
+PW = os.getenv("ORACLE_PW")
+DSN = os.getenv("ORACLE_DSN")
 
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 app.config['SESSION_COOKIE_SAMESITE'] = "None"

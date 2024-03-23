@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Form, Card, Container, Row, Col, Alert, Table, Modal } from 'react-bootstrap';
-import { Line } from 'react-chartjs-2';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
+
+import { Chart } from "react-chartjs-2";
+import "chart.js/auto";
+
 
 function App() {
   const [username, setUsername] = useState(localStorage.getItem('loggedInUser') || "");
@@ -29,6 +32,28 @@ function App() {
   useEffect(() => {
     if (loggedIn) fetchPortfolio();
   }, [loggedIn, username, portfolioTotal]);
+
+  const chartData = {
+    labels: priceHistory.map(([date, price]) => date),
+    datasets: [{
+      label: 'Price (USD)',
+      data: priceHistory.map(([date, price]) => price),
+    }],
+  };
+    const chartOptions = {
+    animation: true,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    borderColor: "teal",
+    fill:true,
+    scales:{
+      y: {
+        beginAtZero: false,
+      },
+    },}
 
   const fetchPortfolio = async () => {
     if (!username) return;
@@ -289,13 +314,16 @@ function App() {
         <Button variant="primary" onClick={() => {
             if (new Date(startDate) > new Date(endDate)) {alert('Start date is greater than end date. Range is invalid.');
             } else {
-            fetchTickerPriceHistory(selectedTicker, startDate, endDate);
-            }}}>View History</Button>
+            fetchTickerPriceHistory(selectedTicker, startDate, endDate);setShowGraph(false);}}}>View Table</Button>
+        <Button variant = "secondary" onClick={() =>  {
+            if (new Date(startDate) > new Date(endDate)) {alert('Start date is greater than end date. Range is invalid.');
+            } else {
+            fetchTickerPriceHistory(selectedTicker, startDate, endDate);setShowGraph(true)}}}>View Graph</Button>
         </Col>
       </Row>
     </Form>
-    {/* Render the price history table or a message if there's no data */}
-    {priceHistory.length > 0 ? 
+    {showGraph & priceHistory.length > 0 ? 
+    <Chart type="line" data={chartData} options={chartOptions} /> : !showGraph & priceHistory.length > 0 ?
     <Table striped bordered hover>
         <thead>
           <tr>
@@ -314,7 +342,7 @@ function App() {
       </Table> : <div>No price history available.</div>}
   </Modal.Body>
   <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowHistoryModal(false)}>Close</Button>
+    <Button variant="secondary" onClick={() => {setShowHistoryModal(false); setShowGraph(false); setStartDate(""); setEndDate(""); setSelectedTicker("")}}>Close</Button>
   </Modal.Footer>
 </Modal>
         </>
