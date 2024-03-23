@@ -1,6 +1,6 @@
 from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, session
 import flask
 import json
 import os
@@ -10,7 +10,7 @@ from models import db, Users, Stocks  # Import db, Users, Stocks directly from m
 from sqlalchemy.pool import NullPool
 import oracledb
 import argon2
-import jwt
+from argon2 import PasswordHasher
 from functools import wraps
 
 #User = User1
@@ -20,12 +20,19 @@ from functools import wraps
 
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins='http://localhost:3000')
+CORS(app, supports_credentials=True, resources={r"/*" : {"origins" : "*"}})
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
 UN = "ADMIN"
 PW = "Capstone.1234"
 DSN = "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-madrid-1.oraclecloud.com))(connect_data=(service_name=g665fdafabbd3ee_capstonedb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))"
+
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config['SESSION_COOKIE_SAMESITE'] = "None"
+app.config['SESSION_COOKIE_SECURE'] = True
+
+
+ph = PasswordHasher()
 
 pool = oracledb.create_pool(user=UN, password=PW,dsn=DSN)
 
@@ -42,6 +49,14 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+def add_cors_headers(response):
+    origin = request.headers.get('Origin')
+    if origin:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    return response
 
 def call_api_daily(ticker): #This function calls the Alpha Vantage API to get the daily values of a stock
     url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={ticker}&apikey={API_KEY}"
@@ -98,19 +113,33 @@ def get_user_stocks_list(username):
     except KeyError:
         flask.abort(404)
 
-def check_password(username, password): #This function checks if the password is correct for the given user
+def check_if_stock_exists(stock): #This function checks if a stock exists in the API
     try:
-        user = Users.query.filter_by(USERNAME = username).first()
-        if user is None:
-            return jsonify({"error": "User not found."}), 404
-        password_hash = user.PASSWORD
-        if argon2.argon2_verify(password, password_hash):
+        data = call_api_daily(stock)
+        data = data["Time Series (Daily)"]
+        if data:
             return True
         else:
             return False
     except Exception as e:
+        print(f"Error checking if {stock} exists: {e}")
+        return False
+
+def check_password(username, password):
+    try:
+        user = Users.query.filter_by(USERNAME=username).first()
+        if user is None:
+            return False
+        password_hash = user.PASSWORD
+        # Verify the password
+        try:
+            ph.verify(password_hash, password)
+            return True
+        except argon2.exceptions.VerifyMismatchError:
+            return False
+    except Exception as e:
         print(f"Error checking password for user {username}: {e}")
-        return jsonify({"error": "An error occured."}), 500
+        return False
 
 def hash_password(password): #This function hashes the password
     return argon2.argon2_hash(password)
@@ -201,25 +230,7 @@ def total_portfolio_calc(stocks): #This function calculates the total value of t
             print(f"Could not fetch data for {ticker}.")
     return round(total, 2)
 
-
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({"message": "Token is missing!"}), 403
-        try:
-            if token.startswith("Bearer "):
-                token = token.split(" ")[1]
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            user = Users.query.filter_by(USERNAME = data["username"]).first()
-        except:
-            return jsonify({'message': 'Token is invalid!'}), 401
-        return f(user, *args, **kwargs)
-    return decorated
-
-@app.route("/api/portfolio", methods = ["GET"]) #This route returns the complete portfolio of the user
-@token_required
+@app.route("/api/portfolio/", methods = ["GET"]) #This route returns the complete portfolio of the user
 def get_portfolio():
     user = request.args.get("username")
     portfolio = {}
@@ -236,93 +247,117 @@ def get_portfolio():
         if latest_price == float("NaN"):
             print(f"Could not fetch data for {stock}.")
             continue
-        portfolio["stocks_owned"][stock] = {"quantity": quantity, "price": round(latest_price, 2), "price_total": round(latest_price * quantity, 2)}
+        portfolio["stocks_owned"][stock] = {"quantity": quantity, "price": round(float(latest_price), 2), "price_total": round(float(latest_price) * quantity, 2)}
     portfolio["total_value"] = total_portfolio_calc(stocks_list)
     return jsonify(portfolio)
 
 @app.route("/api/portfolio/<stock_symbol>", methods = ["GET"])
 def prices_history(stock_symbol):
     historical_data = {}
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
-    if start_date is not None:
-        start_date = get_next_weekday(datetime.strptime(start_date, "%Y-%m-%d").date()) #We get the start date for the API call and make sure it is a weekday
+    start_date_str = request.args.get("start_date")
+    end_date_str = request.args.get("end_date")
+    if start_date_str:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        start_date = get_next_weekday(start_date)
     else:
         start_date = get_next_weekday(datetime.today() - timedelta(days=30))
-    if end_date is not None:
-        end_date = get_last_weekday(datetime.strptime(end_date, "%Y-%m-%d").date()) #We get the end date for the API call and also make sure it is a weekday
+    if end_date_str:
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        end_date = get_last_weekday(end_date)
     else:
         end_date = get_last_weekday(datetime.today())
-    time_difference = datetime.strptime(end_date, "%Y-%m-%d").date() - datetime.strptime(start_date, "%Y-%m-%d").date()
+    start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+    end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+    time_difference = end_date - start_date
     if time_difference.days > 180:
         data = call_api_monthly(stock_symbol)
-        dates = list(data["Time Series (Monthly)"].keys())
+        time_series_key = "Monthly Time Series"
     elif time_difference.days > 30:
         data = call_api_weekly(stock_symbol)
-        dates = list(data["Time Series (Weekly)"].keys())
-    else:
+        time_series_key = "Weekly Time Series"
+    elif time_difference.days > 0:
         data = call_api_daily(stock_symbol)
-        dates = list(data["Time Series (Daily)"].keys())
-    dates.sort()
-    dates = dates[dates.index(start_date):(dates.index(end_date)+1)] #We get the dates between the start and end dates specified
+        time_series_key = "Time Series (Daily)"
+    else:
+        return jsonify({"message": "Invalid date range."}), 200
+    dates = list(data[time_series_key].keys())
+    dates.sort(key=lambda date: datetime.strptime(date, "%Y-%m-%d"))
+    while str(start_date) not in dates and start_date <= end_date:
+        start_date += timedelta(days=1)
+    while str(end_date) not in dates and end_date >= start_date:
+        end_date -= timedelta(days=1)
+    dates = [date for date in dates if datetime.strptime(date, "%Y-%m-%d").date() >= start_date and datetime.strptime(date, "%Y-%m-%d").date() <= end_date]
     for date in dates:
-        historical_data[date] = data["Time Series (Daily)"][date]["4. close"]
+        historical_data[date] = str(round(float(data[time_series_key][date]["4. close"]), 2))
     return jsonify(historical_data)
 
 
 
 @app.route("/update_user", methods = ["PUT"]) #This route is used to update the user's portfolio information
-@token_required
 def update_user():
     try:
         data = request.json
         action = data["action"]
         username = data["username"]
         stock = data["stock"]
-        quantity = data["quantity"]
-        if action == "add": #If the action is "add", we add the stock to the portfolio provided it is not already there
-            if check_for_stock(username, stock):
-                return jsonify({"message": "Stock {stock} already in portfolio."}), 200
-            else:
-                add_stock(username, stock, quantity)
-                print("Adding {stock} to the portfolio, {quantity} shares will be added.")
-                return jsonify({"message": "Stock {stock} added successfully."}), 200
-        #If the actions are "remove" or "modify", we check if the stock is in the portfolio so it can be removed or modified
-        elif action == "remove":
-            if not check_for_stock(username, stock):
-                return jsonify({"message": "Stock {stock} not in portfolio."}), 200
-            else:
-                remove_stock(username, stock)
-                print("Removing {stock} from the portfolio.")
-                return jsonify({"message": "Stock {stock} removed successfully."}), 200
-        elif action == "modify":
-            if not check_for_stock(username, stock):
-                return jsonify({"message": "Stock {stock} not in portfolio."}), 200
-            else:
-                modify_stock_quantity(username, stock, quantity)
-                if quantity > 0:
-                    print("Updating {stock} in the portfolio to {quantity} shares.")
-                    return jsonify({"message": "Stock {stock} updated successfully to {quantity} shares."}), 200
+        quantity = int(data["quantity"])
+        if check_if_stock_exists(stock):
+            if action == "add": #If the action is "add", we add the stock to the portfolio provided it is not already there
+                if check_for_stock(username, stock):
+                    return jsonify({"message": "Stock {stock} already in portfolio."}), 200
                 else:
-                    return jsonify({"message": "Stock {stock} removed successfully."}), 200
+                    if quantity == 0:
+                        return jsonify({"message": "Quantity must be greater than 0."}), 200
+                    elif quantity < 0:
+                        return jsonify({"message": "Quantity cannot be negative."}), 200
+                    add_stock(username, stock, quantity)
+                    print("Adding to the portfolio.")
+                    return jsonify({"message": "Stock added successfully."}), 200
+            #If the actions are "remove" or "modify", we check if the stock is in the portfolio so it can be removed or modified
+            elif action == "modify":
+                if not check_for_stock(username, stock):
+                    return jsonify({"message": "Stock not in portfolio."}), 200
+                else:
+                    if quantity > 0:
+                        modify_stock_quantity(username, stock, quantity)
+                        print("Updating stock quantity in the portfolio.")
+                        return jsonify({"message": "Stock quantity updated successfully."}), 200
+                    elif quantity<0:
+                        return jsonify({"message": "Stock quantity cannot be negative."}), 200
+                    else:
+                        action = "remove"
+            elif action == "remove":
+                if not check_for_stock(username, stock):
+                    return jsonify({"message": "Stock not in portfolio."}), 200
+                else:
+                    remove_stock(username, stock)
+                    print("Removing from the portfolio.")
+                    return jsonify({"message": "Stock removed successfully."}), 200
+
+        else:
+            return jsonify({"message": "Stock does not exist."}), 200 #If the stock does not exist, we return a message saying so. 200 because it is not an error
+
     except Exception as e:
         print(f"Error updating user: {e}")
         return jsonify({"message": "Error updating user."}), 400
 
-@app.route('/login', methods = ['POST'])
-def login(): #This route is used to check the user's credentials and return a token if they are correct
+@app.route('/login', methods=['POST'])
+def login():
     data = request.json
-    username = Users.query.filter_by(USERNAME = data["username"]).first()
-    password = data["password"]
-    if username is not None:
-        if check_password(username, password):
-            # Use username.USERNAME (or the correct attribute name) to get the actual username string
-            token = jwt.encode(
-                {"username": username.USERNAME, "iat": datetime.now(), "exp": datetime.now() + timedelta(minutes=120)},
-                app.config["SECRET_KEY"], algorithm="HS256")
-            return jsonify({"success": "true", "message": "Login successful.", "token": token}), 200
+    user = data.get("username")
+    username = Users.query.filter_by(USERNAME=user).first()
+    password = data.get("password")
+    if username and check_password(username.USERNAME, password):
+        session.permanent = True
+        session.modified = True
+        session['username'] = username.USERNAME
+        return jsonify({"username": session['username'], "message": "Logged in successfully."}), 200
     else:
-        return jsonify({"success": "false","message": "User not found or incorrect password."}), 404
+        return jsonify({"success": "false", "message": "User not found or incorrect password."}), 404
+@app.route('/logout', methods=['GET'])
+def logout():
+    session.clear()
+    return jsonify({"message": "Logged out."}), 200
 
 
 if __name__ == "__main__":
