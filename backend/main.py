@@ -246,13 +246,14 @@ def get_portfolio():
     portfolio["stocks_owned"] = {}
     portfolio["total_value"] = 0
     stocks_list = get_user_stocks_list(user.USERNAME)
-    for stock, quantity in stocks_list.items():
-        latest_price = get_latest_closing_price(stock)
-        if latest_price == float("NaN"):
-            print(f"Could not fetch data for {stock}.")
-            continue
-        portfolio["stocks_owned"][stock] = {"quantity": quantity, "price": round(float(latest_price), 2), "price_total": round(float(latest_price) * quantity, 2)}
-    portfolio["total_value"] = total_portfolio_calc(stocks_list)
+    if len(stocks_list) > 0:
+        for stock, quantity in stocks_list.items():
+            latest_price = get_latest_closing_price(stock)
+            if latest_price == float("NaN"):
+                print(f"Could not fetch data for {stock}.")
+                continue
+            portfolio["stocks_owned"][stock] = {"quantity": quantity, "price": round(float(latest_price), 2), "price_total": round(float(latest_price) * quantity, 2)}
+        portfolio["total_value"] = total_portfolio_calc(stocks_list)
     return jsonify(portfolio)
 
 @app.route("/api/portfolio/<stock_symbol>", methods = ["GET"])
