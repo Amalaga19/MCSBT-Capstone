@@ -28,7 +28,7 @@ PW = os.getenv("ORACLE_PW") #This gets the Oracle password from the .env file
 DSN = os.getenv("ORACLE_DSN") #This gets the Oracle DSN from the .env file
 
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") #This gets the secret key from the .env file
-app.config['SESSION_COOKIE_SAMESITE'] = "None" #This is needed for the session to work with CORS
+app.config['SESSION_COOKIE_SAMESITE'] = None #This is needed for the session to work with CORS
 app.config['SESSION_COOKIE_SECURE'] = True #This too
 
 
@@ -45,6 +45,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 app.config['SQLALCHEMY_ECHO'] = True
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
+app.after_request(add_cors_headers)
 db.init_app(app)
 
 with app.app_context():
@@ -59,6 +60,9 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     return response
+
+app.after_request(add_cors_headers)
+
 
 def call_api_daily(ticker): #This function calls the Alpha Vantage API to get the daily values of a stock
     url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={ticker}&apikey={API_KEY}"
