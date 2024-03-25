@@ -20,7 +20,7 @@ from functools import wraps
 
 
 app = Flask(__name__)
-CORS(app, supports_credentials= True, resources={r"/api/*": {"origins": "https://mcsbt-integration-ams-frontend.storage.googleapis.com"}})
+CORS(app, supports_credentials=True, resources={r"/*" : {"origins" : "*"}}) #This is needed for the CORS to work with the frontend
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_KEY") #This gets the API key from the .env file
 UN = os.getenv("ORACLE_UN") #This gets the Oracle username from the .env file
