@@ -1,7 +1,8 @@
-#README
+# README
 This is a stock portfolio viewer app created for my Capstone Project class. It consists of a react.js frontend and a python backend, connected to an OracleDB relational database. The stocks data is obtained from the AlphaVantage API.
 
-##Usage
+## Usage
+The app is deployed [here](https://mcsbt-integration-ams-frontend.storage.googleapis.com/index.html).
  - Upon entering the page, the user will be asked to enter their login credentials. Currently only one user exists (`User1`, password `Password123`), which was created manually on the database. The backend is able to modify the database so registering new users will be possible in the future. Feel free to use the app using these credentials. The password is hashed using the Argon2 algorithm and compared to the one stored in the database for this particular user. If the entered password's hash matches the one stored in the database, the user is let in.
  - The user will then be able to see the list of stocks they own and the total value of their portfolio. Each stock's card has three buttons: `Remove`, `View Price History`, and `Update Quantity`. Upon clicking the `Remove` button, the stock is removed from the portfolio and the total value is updated. When the `Update Quantity ` button is clicked, the user is prompted to enter the new amount of shares they own of that particular stock, and the changes are reflected upon clicking the `Update` button. If the `View Price History` button is clicked, the user is asked to select two dates between which they will view the price history of the stock (if these are left empty then it defaults to the last 30 days), and will be able to choose whether to view a table of the prices or a graph showing the same information.
  - The session is stored locally, so if the user closes the website and opens it again later they will not be asked to log back in. However, if the `Log Out` button is clicked, the user is returned to the login page as the local storage is cleared.
